@@ -47,6 +47,8 @@ Required tools installed:
 
 ## Example
 
+`./ipviz.sh -o examples/example_1.png examples/example_1.json`
+
 Input:
 
 [Heatmap Example 1](examples/example_1.json)
