@@ -18,7 +18,7 @@ OPTIONS:
     -? : This message
     -c CIDR
        Limit the output to this CIDR
-       Default: 0.0.0.0/0
+       Default to /16 subnet of the lowest IP in input
 
 input_json:
     file with json array and the following object structure:
