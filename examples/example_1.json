@@ -25,6 +25,21 @@
     "name": "db"
   },
   {
+    "cidr": "10.107.64.0/19",
+    "available_ips": 2225,
+    "name": "processing"
+  },
+  {
+    "cidr": "10.107.128.0/18",
+    "available_ips": 9000,
+    "name": "streaming"
+  },
+  {
+    "cidr": "10.107.192.0/20",
+    "available_ips": 4012,
+    "name": "backup"
+  },
+  {
     "cidr": "10.107.240.0/21",
     "available_ips": 3852,
     "name": "util 1"
@@ -35,7 +50,7 @@
     "name": "util 2"
   },
   {
-    "cidr": "10.107.255.0/26",
+    "cidr": "10.107.255.0/25",
     "available_ips": 62,
     "name": "util 3"
   }
