@@ -27,16 +27,16 @@
   {
     "cidr": "10.107.240.0/21",
     "available_ips": 3852,
-    "name": "util"
+    "name": "util 1"
   },
   {
     "cidr": "10.107.254.0/26",
     "available_ips": 0,
-    "name": "util"
+    "name": "util 2"
   },
   {
     "cidr": "10.107.255.0/26",
     "available_ips": 62,
-    "name": "util"
+    "name": "util 3"
   }
 ]

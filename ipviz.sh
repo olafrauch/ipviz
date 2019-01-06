@@ -11,7 +11,7 @@ usage() {
     cat << EOF
 Transforms a list of subnets with allocated ips in a simple heatmap png
 =======================================================================
-usage: $PROGRAM [OPTIONS] [-c cidr_limit] input_json [output_png]
+usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] input_json
 
 OPTIONS:
     -d : Debug output
@@ -19,7 +19,8 @@ OPTIONS:
     -c CIDR
        Limit the output to this CIDR
        Default to /16 subnet of the lowest IP in input
-
+    -o output_png
+       defaults to heatmap_<baseip_of_cidr>.png
 input_json:
     file with json array and the following object structure:
     [
@@ -35,8 +36,9 @@ input_json:
       }
     ]
 
-output_png:
-    Defaults to heatmap_<baseip_of_cidr>.png
+* each subnet is rendered as a block in the heatmap
+* the allocated ips in a subnet are filled from left/top to right/down
+* the free ips are rendered with a random background color in the block
 
 Required tools installed:
  - ipv4-heatmap "make install" from: https://github.com/measurement-factory/ipv4-heatmap
@@ -48,38 +50,34 @@ Required tools installed:
 EOF
 }
 
-# Usage:
-#   ipviz.sh [input json] [cidr limit] [output png]
-# ARGS:
-#
 main() {
-    # Defaults:
     parse_arguments $@
     local readonly input="${ARG_PARAMETERS[0]:-}"
-    local readonly output="${ARG_PARAMETERS[1]:-}"
     declare -a args
-    if [[ ${#ARG_PARAMETERS[@]} -gt 2 ]]; then
-        args=("${ARG_PARAMETERS[@]:2}")
+    if [[ ${#ARG_PARAMETERS[@]} -gt 1 ]]; then
+        args=("${ARG_PARAMETERS[@]:1}")
     else
-        # Workaround, da bash leere arrays als unset betrachtet. WTF. Fixed in bash 4.4
+        # Workaround: bash assumes empty arrays as unset. WTF. Fixed in bash 4.4
         args=("")
     fi
 
-    if [[ -z ${input} ]]
-    then
+    validate_input_file "${input}"
+    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${args}"
+}
+
+validate_input_file () {
+    local readonly input="${1}"
+    if [[ -z ${input} ]]; then
         usage
         error "Error: *** input file is missing"
         exit 1
     fi
 
-    if [[ ! -f ${input} ]]
-    then
+    if [[ ! -f ${input} ]]; then
         usage
         error "Error: *** input file ${input} not found"
         exit 1
     fi
-
-    process "${input}" "${output:-}" "${CIDR_TO_RENDER_ARG:-}"
 }
 
 # Makes a 16 CIDR based on the smallest IP in the subnet list
@@ -203,7 +201,7 @@ makeUsedIps() {
 parse_arguments() {
     # check command line arguments
     local OPTION OPTARG
-    while getopts "?hdc:" OPTION
+    while getopts "?hdc:o:" OPTION
     do
         case "${OPTION}" in
             \? | h )
@@ -215,6 +213,9 @@ parse_arguments() {
             ;;
             c)
                 CIDR_TO_RENDER_ARG="${OPTARG}"
+            ;;
+            o)
+                OUTPUT_FILE_ARG="${OPTARG}"
             ;;
         esac
     done
@@ -265,23 +266,14 @@ maxwidth() {
 }
 
 notify() { log $LOGLEVEL_SILENT "$1"; }
-
 # Always prints
 critical() { log $LOGLEVEL_CRITICAL "$1"; }
-
 error() { log $LOGLEVEL_ERROR "$1"; }
-
 warn() { log $LOGLEVEL_WARNING "$1"; }
-
 # "info" is already a command
 inf() { log $LOGLEVEL_INFO "$1"; }
-
-provision_log() { log $LOGLEVEL_INFO "${GREEN}$1${NC}"; }
-
 inf_nonewline() { log $LOGLEVEL_INFO "$1" "-n"; }
-
 debug() { log $LOGLEVEL_DEBUG "$1"; }
-
 loglevelpad() {
     printf "[%s]" "$1"
 }
