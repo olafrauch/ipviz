@@ -1,0 +1,42 @@
+[
+  {
+    "cidr": "10.107.1.0/28",
+    "available_ips": 5,
+    "name": "public az1"
+  },
+  {
+    "cidr": "10.107.1.64/28",
+    "available_ips": 2,
+    "name": "public az2"
+  },
+  {
+    "cidr": "10.107.0.128/28",
+    "available_ips": 10,
+    "name": "public az3"
+  },
+  {
+    "cidr": "10.107.10.0/24",
+    "available_ips": 100,
+    "name": "cluster"
+  },
+  {
+    "cidr": "10.107.12.0/22",
+    "available_ips": 900,
+    "name": "db"
+  },
+  {
+    "cidr": "10.107.240.0/21",
+    "available_ips": 3852,
+    "name": "util"
+  },
+  {
+    "cidr": "10.107.254.0/26",
+    "available_ips": 0,
+    "name": "util"
+  },
+  {
+    "cidr": "10.107.255.0/26",
+    "available_ips": 62,
+    "name": "util"
+  }
+]
