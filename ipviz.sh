@@ -114,8 +114,12 @@ process() {
     local readonly annotations=$(echo -e "$(makeAnnotations "${subnets_input_file}")")
     local readonly shades=$(echo -e "$(makeShades "${subnets_input_file}")")
 
-    used_ip_count=$(echo -e "$used_ips" | wc -l)
-    subnet_count=$(echo -e "$annotations" | wc -l)
+    debug "Sample shades:\n$(echo -e "${shades}" | head -n 15)"
+    debug "Sample annotations:\n$(echo -e "${annotations}" | head -n 15)"
+    debug "Sample ips:\n$(echo -e "${used_ips}" | head -n 15)"
+
+    used_ip_count=$(echo -e "${used_ips}" | wc -l)
+    subnet_count=$(echo -e "${annotations}" | wc -l)
 
     inf "Generating heatmap with ${used_ip_count} IPs in ${subnet_count} subnets"
     # Generate heatmap
@@ -191,8 +195,16 @@ makeUsedIps() {
         local readonly cidr=$(getCidr "${subnet}")
         local readonly name=$(getName "${subnet}")
         local readonly available=$(getAvailable "${subnet}")
-        local readonly total=$(calcIPsInCidr "$cidr")
-        local readonly used=$((2 + total - available))
+        local readonly total=$(( $(calcIPsInCidr "$cidr") + 2 ))
+        local readonly used=$((total - available))
+        debug "Processing ${name} with CIDR ${cidr}"
+        debug " total IPs: ${total}"
+        debug " available IPs: ${available}"
+        debug " used IPs: ${used}"
+
+        if (( ${used} > ${total} )); then
+            warn "CIDR ${cidr} invalid used (${used}) > total (${total})"
+        fi
         # Generate a list of <n> IPs from a cidr
         prips "${cidr}" | head -n "${used}"
     done

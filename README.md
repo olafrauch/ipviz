@@ -47,8 +47,10 @@ Required tools installed:
 
 ## Example
 
-Input
+Input:
+
 [Heatmap Example 1](examples/example_1.json)
 
 Output:
+
 ![Heatmap Example 1](examples/example_1.png)

@@ -41,7 +41,7 @@
   },
   {
     "cidr": "10.107.240.0/21",
-    "available_ips": 3852,
+    "available_ips": 1852,
     "name": "util 1"
   },
   {
