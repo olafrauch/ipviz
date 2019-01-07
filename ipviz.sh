@@ -186,7 +186,7 @@ process() {
         "${outputfile}"
     inf "Enhance image with parameter title and border"
     montage \
-        -label "${used_ip_count} ips allocated in ${subnet_count} subnets of ${cidr_to_render} - $(LANG=de_DE date)"\
+        -label "${used_ip_count} ips allocated in ${subnet_count} subnets of ${cidr_to_render} - $(date)"\
         -pointsize 18 \
         -frame 5 -geometry +0+0 \
         "${outputfile}" \
