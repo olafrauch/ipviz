@@ -196,7 +196,6 @@ getCidr() {
         ;;
         *)
             error "Unknown input format '${input_format}'"
-            usage
             exit 1
         ;;
     esac
@@ -216,7 +215,6 @@ getName() {
         ;;
         *)
             error "Unknown input format '${input_format}'"
-            usage
             exit 1
         ;;
     esac
@@ -236,7 +234,6 @@ getAvailable() {
         ;;
         *)
             error "Unknown input format '${input_format}'"
-            usage
             exit 1
         ;;
     esac
@@ -255,7 +252,7 @@ countIPsInCidr() {
 makeAnnotations() {
     local readonly subnet_file="${1}"
     local readonly input_format="${2}"
-    jq -c '.[]' ${subnet_file} | while read subnet; do
+    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         local readonly name=$(getName "${subnet}" "${input_format}")
         echo "${cidr}\t${name}"
@@ -266,17 +263,34 @@ makeAnnotations() {
 makeShades() {
     local readonly subnet_file="${1}"
     local readonly input_format="${2}"
-    jq -c '.[]' ${subnet_file} | while read subnet; do
+    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         echo "${cidr}\t$(randomCidrColor)\t96"
     done
+}
+
+readSubnets() {
+    local readonly subnet_file="${1}"
+    local readonly input_format="${2}"
+    case "${input_format,,}" in
+        "aws" )
+            jq -c '.[] | .[]' "${subnet_file}"
+        ;;
+        "simple" | "" )
+            jq -c '.[]' "${subnet_file}"
+        ;;
+        *)
+            error "Unknown input format '${input_format}'"
+            exit 1
+        ;;
+    esac
 }
 
 # Create the ipv4-heatmap ip list (list of used ips in all subnets)
 makeUsedIps() {
     local readonly subnet_file="${1}"
     local readonly input_format="${2}"
-    jq -c '.[]' "${subnet_file}" | while read subnet; do
+    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         local readonly name=$(getName "${subnet}" "${input_format}")
         local readonly available=$(getAvailable "${subnet}" "${input_format}")
