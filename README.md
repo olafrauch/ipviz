@@ -2,6 +2,13 @@
 
 Transforms a list of json subnets to a heatmap png
 
+Highlights:
+
+* Visualize your aws subnets as map to get an overview of available IP ranges and ip usage of each subnet.
+* Can be directly used with output from aws ec2 describe-subnets
+* JSON report with usage metrics of the subnets
+
+
 Based on https://github.com/measurement-factory/ipv4-heatmap
 
 ```
