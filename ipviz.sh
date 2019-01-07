@@ -11,17 +11,20 @@ usage() {
     cat << EOF
 Transforms a list of subnets with allocated ips in a simple heatmap png
 =======================================================================
-usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] input_json
+usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] [-t aws|simple] input_json
 
 OPTIONS:
     -d : Debug output
     -? : This message
-    -t : Input format type: SIMPLE, AWS
+    -t : Input format type:
+          AWS (default): Format as aws ec2 describe-subnets --output json
+          SIMPLE : Format see below
     -c CIDR
        Limit the output to this CIDR
        Default to /16 subnet of the lowest IP in input
     -o output_png
        defaults to heatmap_<baseip_of_cidr>.png
+    -r : Export input file as enhanced output file compatible with SIMPLE File format
 
 input_json:
     file with json array and the following object structure:
@@ -29,13 +32,15 @@ input_json:
     [
       {
         "cidr": "10.107.0.0/28",
-        "available_ips": 5,
-        "name": "public az1"
+        "available": 5,
+        "name": "public az1",
+        "az": "eu-central-1"
       },
       {
         "cidr": "10.107.0.64/28",
-        "available_ips": 2,
-        "name": "public az2"
+        "available": 2,
+        "name": "public az2",
+        "az": "eu-central-1"
       }
     ]
  or
@@ -51,7 +56,7 @@ Required tools:
  - jq
  - imagemagick
  - ipcalc
- - prips
+ - nmap
  - grepcidr
 
 EOF
@@ -71,14 +76,14 @@ main() {
 
     debug "Working directory $(pwd)"
     validate_input_file "${input}"
-    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${INPUT_FORMAT_TYPE_ARG:-SIMPLE}" "${args}"
+    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${INPUT_FORMAT_TYPE_ARG:-aws}" "${args}"
 }
 
 validate_environment() {
     check_program "jq"
     check_program "convert"
     check_program "ipcalc"
-    check_program "prips"
+    check_program "nmap"
     check_program "grepcidr"
     check_program "ipv4-heatmap"
 }
@@ -150,6 +155,15 @@ process() {
     debug "Sample annotations:\n$(echo -e "${annotations}" | head -n 15)"
     debug "Sample ips:\n$(echo -e "${used_ips}" | head -n 15)"
 
+    # Export
+    if [[ "${input_format,,}" == "aws" ]]; then
+        if [[ "${EXPORT_REPORT_ARG:-false}" == "true" ]]; then
+            local readonly outputfile_export="${outputfile_arg:-heatmap_${baseip}_simple.json}"
+            inf "Exporting the input file ${subnets_input_file} (${input_format}) as enhanced json in simple format to ${outputfile_export}"
+            makeReport "${subnets_input_file}" "${input_format}" "${outputfile_export}"
+        fi
+    fi
+
     used_ip_count=$(echo -e "${used_ips}" | wc -l)
     subnet_count=$(echo -e "${annotations}" | wc -l)
 
@@ -178,6 +192,47 @@ process() {
         "${outputfile}" \
         "${outputfile}"
     inf "File '${outputfile}' generated"
+}
+
+makeReport(){
+    local readonly input="${1}"
+    local readonly input_format="${2}"
+    local readonly output="${3}"
+    assertNotEmpty "input file name" "${input:-}"
+    assertNotEmpty "input_format" "${input_format:-}"
+    assertNotEmpty "output file name" "${output:-}"
+
+    list_of_objects=($(readSubnets "${input}" "${input_format}" | while read subnet; do
+            echo -e "$(convertSubnet "${subnet}" | jq -c '.')"
+        done
+    ))
+    combined_objects="$(printf ",%s" "${list_of_objects[@]}")"
+    echo "[ ${combined_objects:1} ]" | jq '.'  > "${output}"
+}
+
+convertSubnet() {
+    local readonly subnet="${1}"
+    local readonly cidr=$(getCidr "${subnet}" "${input_format}")
+    local readonly name=$(getName "${subnet}" "${input_format}")
+    local readonly available=$(getAvailable "${subnet}" "${input_format}")
+    local readonly total=$(( $(countIPsInCidr "$cidr") + 2 ))
+    local readonly used=$((total - available))
+    local readonly az=$(getAZ "${subnet}" "${input_format}")
+    list_of_attributes=(
+        $(jsonAttribute "name" "${name}")
+        $(jsonAttribute "cidr" "${cidr}")
+        $(jsonAttribute "az" "${az}")
+        $(jsonAttribute "available" "${available}")
+        $(jsonAttribute "total" "${total}")
+        $(jsonAttribute "used" "${used}")
+        $(jsonAttribute "usage_percent" "$(( 100 * used / total ))")
+    )
+    all_attributes="$(printf ",%s" "${list_of_attributes[@]}")"
+    echo "{ ${all_attributes:1} }" | jq -c '.'
+}
+
+jsonAttribute() {
+    echo "\"$1\":\"$2\""
 }
 
 getCidr() {
@@ -220,6 +275,26 @@ getName() {
     esac
 }
 
+getAZ() {
+    local readonly subnet="${1}"
+    local readonly input_format="${2}"
+    assertNotEmpty "subnet json object" "${subnet:-}"
+    assertNotEmpty "input_format" "${input_format:-}"
+    case "${input_format,,}" in
+        "aws" )
+            echo "${subnet}" | jq -r '.AvailabilityZone // empty'
+        ;;
+        "simple" | "" )
+            echo "${subnet}" | jq -r '.az // empty'
+        ;;
+        *)
+            error "Unknown input format '${input_format}'"
+            exit 1
+        ;;
+    esac
+}
+
+
 getAvailable() {
     local readonly subnet="${1}"
     local readonly input_format="${2}"
@@ -230,7 +305,7 @@ getAvailable() {
             echo "${subnet}" | jq -r '.AvailableIpAddressCount // empty'
         ;;
         "simple" | "" )
-            echo "${subnet}" | jq -r '.available_ips // empty'
+            echo "${subnet}" | jq -r '.available // empty'
         ;;
         *)
             error "Unknown input format '${input_format}'"
@@ -314,7 +389,7 @@ makeUsedIps() {
 parse_arguments() {
     # check command line arguments
     local OPTION OPTARG
-    while getopts "?hdc:o:t:" OPTION
+    while getopts "?hdrc:o:t:" OPTION
     do
         case "${OPTION}" in
             \? | h )
@@ -323,6 +398,9 @@ parse_arguments() {
             ;;
             d)
                 LOG_LEVEL=${LOGLEVEL_DEBUG}
+            ;;
+            r)
+                EXPORT_REPORT_ARG=true
             ;;
             c)
                 CIDR_TO_RENDER_ARG="${OPTARG}"
