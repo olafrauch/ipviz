@@ -16,13 +16,16 @@ usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] input_json
 OPTIONS:
     -d : Debug output
     -? : This message
+    -t : Input format type: SIMPLE, AWS
     -c CIDR
        Limit the output to this CIDR
        Default to /16 subnet of the lowest IP in input
     -o output_png
        defaults to heatmap_<baseip_of_cidr>.png
+
 input_json:
     file with json array and the following object structure:
+    SIMPLE:
     [
       {
         "cidr": "10.107.0.0/28",
@@ -35,22 +38,27 @@ input_json:
         "name": "public az2"
       }
     ]
+ or
+    AWS:
+    Output as in aws ec2 describe-subnets ...
 
 * each subnet is rendered as a block in the heatmap
 * the allocated ips in a subnet are filled from left/top to right/down
 * the free ips are rendered with a random background color in the block
 
-Required tools installed:
+Required tools:
  - ipv4-heatmap "make install" from: https://github.com/measurement-factory/ipv4-heatmap
  - jq
  - imagemagick
  - ipcalc
  - prips
+ - grepcidr
 
 EOF
 }
 
 main() {
+    validate_environment
     parse_arguments $@
     local readonly input="${ARG_PARAMETERS[0]:-}"
     declare -a args
@@ -61,8 +69,28 @@ main() {
         args=("")
     fi
 
+    debug "Working directory $(pwd)"
     validate_input_file "${input}"
-    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${args}"
+    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${INPUT_FORMAT_TYPE_ARG:-SIMPLE}" "${args}"
+}
+
+validate_environment() {
+    check_program "jq"
+    check_program "convert"
+    check_program "ipcalc"
+    check_program "prips"
+    check_program "grepcidr"
+    check_program "ipv4-heatmap"
+}
+
+check_program() {
+    local readonly program="$1"
+    if command -v ${program} >/dev/null; then
+        debug "Check: ${program} is installed : $(which ${program})"
+    else
+        error "Check failed: ${program} is not installed"
+        exit 1
+    fi
 }
 
 validate_input_file () {
@@ -91,9 +119,13 @@ process() {
     local readonly subnets_input_file="${1}"
     local readonly outputfile_arg="${2:-}"
     local readonly cidr_to_render_arg="${3:-}"
+    local readonly input_format="${4:-}"
+
+    debug "Input data file : ${subnets_input_file}"
+    debug "Input data mode : ${input_format}"
 
     # Step 1: Make IP List
-    local readonly used_ips=$(echo -e "$(makeUsedIps "${subnets_input_file}")" | sort)
+    local readonly used_ips=$(echo -e "$(makeUsedIps "${subnets_input_file}" "${input_format}")" | sort)
 
     # Step 2: prepare the cidr for rendering
     local readonly cidr_to_render="${cidr_to_render_arg:-$(best_guess_cidr "${used_ips}")}"
@@ -103,16 +135,16 @@ process() {
     local readonly check="$(echo "$baseip" | grepcidr "${cidr_to_render}" 2>/dev/null)"
     if [[ -z ${check} ]]
     then
-        error "Parameter error: '${cidr_to_render}' is not a valid cidr"
+        error "Parameter error: '${cidr_to_render}' is not a valid cidr ($check)"
         exit 1
     fi
 
     # Step 3: Prepare output file
     local readonly outputfile="${outputfile_arg:-heatmap_${baseip}.png}"
-    inf "Processing '${subnets_input_file}' with cidr limit '${baseip}/${rangebits}' and write to '${outputfile}'"
+    inf "Processing '${subnets_input_file}' in ${input_format} format with cidr limit '${baseip}/${rangebits}' and write to '${outputfile}'"
 
-    local readonly annotations=$(echo -e "$(makeAnnotations "${subnets_input_file}")")
-    local readonly shades=$(echo -e "$(makeShades "${subnets_input_file}")")
+    local readonly annotations=$(echo -e "$(makeAnnotations "${subnets_input_file}" "${input_format}")")
+    local readonly shades=$(echo -e "$(makeShades "${subnets_input_file}" "${input_format}")")
 
     debug "Sample shades:\n$(echo -e "${shades}" | head -n 15)"
     debug "Sample annotations:\n$(echo -e "${annotations}" | head -n 15)"
@@ -149,71 +181,126 @@ process() {
 }
 
 getCidr() {
-    echo ${1} | jq -r '.cidr // empty'
+    local readonly subnet="${1}"
+    local readonly input_format="${2}"
+
+    assertNotEmpty "subnet json object" "${subnet:-}"
+    assertNotEmpty "input_format" "${input_format:-}"
+
+    case "${input_format,,}" in
+        "aws" )
+            echo "${subnet}" | jq -r '.CidrBlock // empty'
+        ;;
+        "simple" | "" )
+            echo "${subnet}" | jq -r '.cidr // empty'
+        ;;
+        *)
+            error "Unknown input format '${input_format}'"
+            usage
+            exit 1
+        ;;
+    esac
 }
 
 getName() {
-    echo ${1} | jq -r '.name // empty'
+    local readonly subnet="${1}"
+    local readonly input_format="${2}"
+    assertNotEmpty "subnet json object" "${subnet:-}"
+    assertNotEmpty "input_format" "${input_format:-}"
+    case "${input_format,,}" in
+        "aws" )
+            echo "${subnet}" | jq -r '.Tags[] | select(.Key | contains("Name")) | .Value // empty'
+        ;;
+        "simple" | "" )
+            echo "${subnet}" | jq -r '.name // empty'
+        ;;
+        *)
+            error "Unknown input format '${input_format}'"
+            usage
+            exit 1
+        ;;
+    esac
 }
 
 getAvailable() {
-    echo ${1} | jq -r '.available_ips // empty'
+    local readonly subnet="${1}"
+    local readonly input_format="${2}"
+    assertNotEmpty "subnet json object" "${subnet:-}"
+    assertNotEmpty "input_format" "${input_format:-}"
+    case "${input_format,,}" in
+        "aws" )
+            echo "${subnet}" | jq -r '.AvailableIpAddressCount // empty'
+        ;;
+        "simple" | "" )
+            echo "${subnet}" | jq -r '.available_ips // empty'
+        ;;
+        *)
+            error "Unknown input format '${input_format}'"
+            usage
+            exit 1
+        ;;
+    esac
 }
 
 randomCidrColor() {
-    echo "0x$(openssl rand -hex 3)"
+    echo "0x$(openssl rand -hex 3 2>/dev/null)"
 }
 
-calcIPsInCidr() {
+countIPsInCidr() {
     local readonly cidr="${1}"
     ipcalc -b "${cidr}" | awk '/Hosts\/Net/ {print $2}'
 }
 
 # Create the ipv4-heatmap annotation file (names for cidr ranges)
 makeAnnotations() {
-    local readonly subnet_file=${1}
+    local readonly subnet_file="${1}"
+    local readonly input_format="${2}"
     jq -c '.[]' ${subnet_file} | while read subnet; do
-        local readonly cidr=$(getCidr "${subnet}")
-        local readonly name=$(getName "${subnet}")
+        local readonly cidr=$(getCidr "${subnet}" "${input_format}")
+        local readonly name=$(getName "${subnet}" "${input_format}")
         echo "${cidr}\t${name}"
     done
 }
 
 # Create the ipv4-heatmap shades file (background for cidr ranges)
 makeShades() {
-    local readonly subnet_file=${1}
+    local readonly subnet_file="${1}"
+    local readonly input_format="${2}"
     jq -c '.[]' ${subnet_file} | while read subnet; do
-        local readonly cidr=$(getCidr "${subnet}")
+        local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         echo "${cidr}\t$(randomCidrColor)\t96"
     done
 }
 
 # Create the ipv4-heatmap ip list (list of used ips in all subnets)
 makeUsedIps() {
-    local readonly subnet_file=${1}
+    local readonly subnet_file="${1}"
+    local readonly input_format="${2}"
     jq -c '.[]' "${subnet_file}" | while read subnet; do
-        local readonly cidr=$(getCidr "${subnet}")
-        local readonly name=$(getName "${subnet}")
-        local readonly available=$(getAvailable "${subnet}")
-        local readonly total=$(( $(calcIPsInCidr "$cidr") + 2 ))
+        local readonly cidr=$(getCidr "${subnet}" "${input_format}")
+        local readonly name=$(getName "${subnet}" "${input_format}")
+        local readonly available=$(getAvailable "${subnet}" "${input_format}")
+        local readonly total=$(( $(countIPsInCidr "$cidr") + 2 ))
         local readonly used=$((total - available))
         debug "Processing ${name} with CIDR ${cidr}"
         debug " total IPs: ${total}"
         debug " available IPs: ${available}"
         debug " used IPs: ${used}"
+        assertNotEmpty "cidr" "${cidr:-}"
 
         if (( ${used} > ${total} )); then
             warn "CIDR ${cidr} invalid used (${used}) > total (${total})"
         fi
         # Generate a list of <n> IPs from a cidr
-        prips "${cidr}" | head -n "${used}"
+        nmap -sL ${cidr} | grep "Nmap scan report" | awk '{print $NF}' | head -n "${used}"
+        #prips "${cidr}" | head -n "${used}"
     done
 }
 
 parse_arguments() {
     # check command line arguments
     local OPTION OPTARG
-    while getopts "?hdc:o:" OPTION
+    while getopts "?hdc:o:t:" OPTION
     do
         case "${OPTION}" in
             \? | h )
@@ -229,6 +316,9 @@ parse_arguments() {
             o)
                 OUTPUT_FILE_ARG="${OPTARG}"
             ;;
+            t)
+                INPUT_FORMAT_TYPE_ARG="${OPTARG}"
+            ;;
         esac
     done
     shift $((OPTIND - 1))
@@ -238,6 +328,24 @@ parse_arguments() {
 }
 
 
+required_value() {
+    local readonly name="${1:-}"
+    local readonly value="${2:-}"
+    local readonly message="${3:-"Missing value for"}"
+    if [[ -z "${value}" ]]
+    then
+        error "${message} '${name}'"
+        exit 1
+    fi
+}
+
+required_arg() {
+    required_value "${1}" "${2}" "Missing argument"
+}
+
+assertNotEmpty() {
+    required_value "${1}" "${2}" "Internal error. Value missing for:"
+}
 
 init_logging() {
     exec 3>&2 # logging stream (file descriptor 3) defaults to STDERR
