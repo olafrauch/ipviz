@@ -102,13 +102,15 @@ validate_input_file () {
     local readonly input="${1}"
     if [[ -z ${input} ]]; then
         usage
-        error "Error: *** input file is missing"
+        error "Error: *** input file is missing."
         exit 1
     fi
 
     if [[ ! -f ${input} ]]; then
         usage
         error "Error: *** input file ${input} not found"
+        error "PWD = $(pwd)"
+        error "$(ls -la)"
         exit 1
     fi
 }
