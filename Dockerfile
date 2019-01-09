@@ -43,6 +43,8 @@ RUN \
 		nmap -V && \
 		ipviz.sh -h && \
 		date && \
+    log "Cleanup"
+		rm -rf /var/lib/apt/lists/* && \
     log "Done"
 
 VOLUME ["${WORKDIR}"]
