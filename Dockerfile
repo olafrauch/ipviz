@@ -40,7 +40,7 @@ RUN \
 		convert -version && \
 		ipcalc -v && \
 		command -v jq && \
-		nmap -? && \
+		nmap -V && \
 		ipviz.sh -h && \
 		date && \
     log "Done"
