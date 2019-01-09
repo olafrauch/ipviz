@@ -12,6 +12,7 @@ RUN \
 	cat /etc/*release* && \
     log "Installing dependencies" && \
 		apt-get update && \
+		apt-get install -y apt-utils && \
     log "Setting locale" && \
 		echo $TZ > /etc/timezone && \
 		export DEBIAN_FRONTEND=noninteractive && apt-get install -y tzdata && \
@@ -39,7 +40,7 @@ RUN \
 		convert -version && \
 		ipcalc -v && \
 		command -v jq && \
-		nmap -v && \
+		nmap -? && \
 		ipviz.sh -h && \
 		date && \
     log "Done"
