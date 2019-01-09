@@ -131,8 +131,8 @@ process() {
     debug "Input data file : ${subnets_input_file}"
     debug "Input data mode : ${input_format}"
 
-    # Step 1: Make IP List
-    local readonly used_ips=$(echo -e "$(makeUsedIps "${subnets_input_file}" "${input_format}")" | sort)
+    # Step 1: Make IP List (newline separated)
+    local readonly used_ips=$(echo -e "$(makeIPListOfUsedIPs "${subnets_input_file}" "${input_format}")" | sort)
 
     # Step 2: prepare the cidr for rendering
     local readonly cidr_to_render="${cidr_to_render_arg:-$(best_guess_cidr "${used_ips}")}"
@@ -364,7 +364,7 @@ readSubnets() {
 }
 
 # Create the ipv4-heatmap ip list (list of used ips in all subnets)
-makeUsedIps() {
+makeIPListOfUsedIPs() {
     local readonly subnet_file="${1}"
     local readonly input_format="${2}"
     readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
@@ -384,7 +384,6 @@ makeUsedIps() {
         fi
         # Generate a list of <n> IPs from a cidr
         nmap -sL ${cidr} | grep "Nmap scan report" | awk '{print $NF}' | head -n "${used}"
-        #prips "${cidr}" | head -n "${used}"
     done
 }
 
