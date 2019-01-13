@@ -20,7 +20,7 @@ OPTIONS:
     -d : Debug output
     -? : This message
     -t : Input format type:
-          AWS (default): Format as aws ec2 describe-subnets --output json
+          AWS (default): Format as aws `ec2 describe-subnets --output json`
           SIMPLE : Format see below
     -c CIDR
        Limit the output to this CIDR
