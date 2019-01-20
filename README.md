@@ -85,17 +85,16 @@ or
 `cat examples/example_1.json | ./ipviz.sh -r -o examples/example_1.png -t simple`
 
 
-Input:
+Input JSON: [Heatmap Example 1](examples/example_1.json)
 
-[Heatmap Example 1](examples/example_1.json)
+Outputs:
 
-Output:
+Report JSON: [Heatmap Example 1](examples/example_1_simple.json)
+
+Heatmap:
 
 ![Heatmap Example 1](examples/example_1.png)
 
-And report:
-
-![Heatmap Example 1](examples/example_1_simple.json)
 
 
 # Source code and build
