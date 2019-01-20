@@ -22,7 +22,7 @@ Run them e.g. with
 
 or with input file:
 
-`cat examples/example_1.json | docker run -i --rm -v $(pwd):/work olafrauch/ipviz:1.0.6 -d -t simple -o examples/example_1.png`
+`cat examples/example_1.json | docker run -i --rm -v $(pwd):/work olafrauch/ipviz -d -t simple -o examples/example_1.png`
 
 ```
 Transforms a list of subnets with allocated ips in a simple heatmap png
