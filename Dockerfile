@@ -22,7 +22,7 @@ RUN \
     log "Preparing ipv4 build dependencies" && \
   		apt-get install -y git make gcc libgd-dev locales && \
     log "Installing ipviz dependencies" && \
-      apt-get install -y ipcalc imagemagick jq nmap grepcidr && \
+      apt-get install -y ipcalc imagemagick jq grepcidr prips && \
       apt-get autoclean && \
     log "Build ipv4-heatmap" && \
       BUILD_DIR="/usr/share/ipv4-heatmap" && \

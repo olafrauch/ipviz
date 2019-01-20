@@ -16,8 +16,13 @@ Based on https://github.com/measurement-factory/ipv4-heatmap
 
 Find ready to run [Docker images in my dockerhub repo](https://cloud.docker.com/u/olafrauch/repository/docker/olafrauch/ipviz)
 
-Run them e.g. with 
-`aws ec2 describe-subnets --output json | docker run -t --rm olafrauch/ipviz:1.0.5`
+Run them e.g. with
+
+`aws ec2 describe-subnets --output json | docker run -i --rm -v $(pwd):/work olafrauch/ipviz:1.0.6`
+
+or with input file:
+
+`cat examples/example_1.json | docker run -i --rm -v $(pwd):/work olafrauch/ipviz:1.0.6 -d -t simple -o examples/example_1.png`
 
 ```
 Transforms a list of subnets with allocated ips in a simple heatmap png
@@ -87,3 +92,14 @@ Input:
 Output:
 
 ![Heatmap Example 1](examples/example_1.png)
+
+And report:
+
+![Heatmap Example 1](examples/example_1_simple.json)
+
+
+# Source code and build
+
+Release is made with npm release-it Package
+e.g.: 
+`release-it minor`

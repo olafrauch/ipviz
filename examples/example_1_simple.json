@@ -1,0 +1,101 @@
+[
+  {
+    "name": "public,az1",
+    "cidr": "10.0.1.0/28",
+    "az": "",
+    "available": "5",
+    "total": "16",
+    "used": "11",
+    "usage_percent": "68"
+  },
+  {
+    "name": "public,az2",
+    "cidr": "10.0.1.64/28",
+    "az": "",
+    "available": "2",
+    "total": "16",
+    "used": "14",
+    "usage_percent": "87"
+  },
+  {
+    "name": "public,az3",
+    "cidr": "10.0.0.128/28",
+    "az": "",
+    "available": "10",
+    "total": "16",
+    "used": "6",
+    "usage_percent": "37"
+  },
+  {
+    "name": "cluster",
+    "cidr": "10.0.10.0/24",
+    "az": "",
+    "available": "100",
+    "total": "256",
+    "used": "156",
+    "usage_percent": "60"
+  },
+  {
+    "name": "db",
+    "cidr": "10.0.12.0/22",
+    "az": "",
+    "available": "900",
+    "total": "1024",
+    "used": "124",
+    "usage_percent": "12"
+  },
+  {
+    "name": "processing",
+    "cidr": "10.0.64.0/19",
+    "az": "",
+    "available": "2225",
+    "total": "8192",
+    "used": "5967",
+    "usage_percent": "72"
+  },
+  {
+    "name": "streaming",
+    "cidr": "10.0.128.0/20",
+    "az": "",
+    "available": "3200",
+    "total": "4096",
+    "used": "896",
+    "usage_percent": "21"
+  },
+  {
+    "name": "backup",
+    "cidr": "10.0.192.0/20",
+    "az": "",
+    "available": "4012",
+    "total": "4096",
+    "used": "84",
+    "usage_percent": "2"
+  },
+  {
+    "name": "util,1",
+    "cidr": "10.0.240.0/21",
+    "az": "",
+    "available": "1852",
+    "total": "2048",
+    "used": "196",
+    "usage_percent": "9"
+  },
+  {
+    "name": "util,2",
+    "cidr": "10.0.254.0/26",
+    "az": "",
+    "available": "0",
+    "total": "64",
+    "used": "64",
+    "usage_percent": "100"
+  },
+  {
+    "name": "util,3",
+    "cidr": "10.0.255.0/25",
+    "az": "",
+    "available": "62",
+    "total": "128",
+    "used": "66",
+    "usage_percent": "51"
+  }
+]

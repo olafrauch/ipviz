@@ -56,7 +56,7 @@ Required tools:
  - jq
  - imagemagick
  - ipcalc
- - nmap
+ - prips
  - grepcidr
 
 EOF
@@ -65,7 +65,7 @@ EOF
 main() {
     validate_environment
     parse_arguments $@
-    local readonly input="${ARG_PARAMETERS[0]:-/dev/stdin}"
+    local readonly inputfile_arg="${ARG_PARAMETERS[0]:-/dev/stdin}"
     declare -a args
     if [[ ${#ARG_PARAMETERS[@]} -gt 1 ]]; then
         args=("${ARG_PARAMETERS[@]:1}")
@@ -75,15 +75,15 @@ main() {
     fi
 
     debug "Working directory $(pwd)"
-    validate_input_file "${input}"
-    process "${input}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${INPUT_FORMAT_TYPE_ARG:-aws}" "${args}"
+    validate_inputfile_arg "${inputfile_arg}"
+    process "${inputfile_arg}" "${OUTPUT_FILE_ARG:-}" "${CIDR_TO_RENDER_ARG:-}" "${INPUT_FORMAT_TYPE_ARG:-aws}" "${args}"
 }
 
 validate_environment() {
     check_program "jq"
     check_program "convert"
     check_program "ipcalc"
-    check_program "nmap"
+    check_program "prips"
     check_program "grepcidr"
     check_program "ipv4-heatmap"
 }
@@ -98,7 +98,7 @@ check_program() {
     fi
 }
 
-validate_input_file () {
+validate_inputfile_arg () {
     local readonly input="${1}"
     if [[ -z ${input} ]]; then
         usage
@@ -115,16 +115,16 @@ best_guess_cidr() {
 }
 
 process() {
-    local readonly subnets_input_file="${1}"
+    local readonly inputfile_arg="${1}"
     local readonly outputfile_arg="${2:-}"
     local readonly cidr_to_render_arg="${3:-}"
     local readonly input_format="${4:-}"
 
-    debug "Input data file : ${subnets_input_file}"
     debug "Input data mode : ${input_format}"
 
+    local readonly input=$(cat "${inputfile_arg}")
     # Step 1: Make IP List (newline separated)
-    local readonly used_ips=$(echo -e "$(makeIPListOfUsedIPs "${subnets_input_file}" "${input_format}")" | sort)
+    local readonly used_ips=$(echo -e "$(makeIPListOfUsedIPs "${input}" "${input_format}")" | sort)
 
     # Step 2: prepare the cidr for rendering
     local readonly cidr_to_render="${cidr_to_render_arg:-$(best_guess_cidr "${used_ips}")}"
@@ -139,27 +139,27 @@ process() {
     fi
 
     # Step 3: Prepare output file
-    local readonly outputfile="${outputfile_arg:-heatmap_${baseip}.png}"
-    inf "Processing '${subnets_input_file}' in ${input_format} format with cidr limit '${baseip}/${rangebits}' and write to '${outputfile}'"
+    local readonly output_heatmap="${outputfile_arg:-heatmap_${baseip}.png}"
+    local readonly output_basename=${output_heatmap%.*}
+    local readonly output_report="${output_basename}_simple.json"
 
-    local readonly annotations=$(echo -e "$(makeAnnotations "${subnets_input_file}" "${input_format}")")
-    local readonly shades=$(echo -e "$(makeShades "${subnets_input_file}" "${input_format}")")
+    inf "Processing '${inputfile_arg}' in ${input_format} format with cidr limit '${baseip}/${rangebits}' and write to '${output_heatmap}'"
+
+    local readonly annotations=$(echo -e "$(makeAnnotations "${input}" "${input_format}")")
+    local readonly shades=$(echo -e "$(makeShades "${input}" "${input_format}")")
 
     debug "Sample shades:\n$(echo -e "${shades}" | head -n 15)"
     debug "Sample annotations:\n$(echo -e "${annotations}" | head -n 15)"
     debug "Sample ips:\n$(echo -e "${used_ips}" | head -n 15)"
 
-    # Export
-    if [[ "${input_format,,}" == "aws" ]]; then
-        if [[ "${EXPORT_REPORT_ARG:-false}" == "true" ]]; then
-            local readonly outputfile_export="${outputfile_arg:-heatmap_${baseip}_simple.json}"
-            inf "Exporting the input file ${subnets_input_file} (${input_format}) as enhanced json in simple format to ${outputfile_export}"
-            makeReport "${subnets_input_file}" "${input_format}" "${outputfile_export}"
-        fi
+    # Export report
+    if [[ "${EXPORT_REPORT_ARG:-false}" == "true" ]]; then
+        inf "Exporting the input file ${inputfile_arg} (${input_format}) as enhanced json in simple format to ${output_report}"
+        makeReport "${input}" "${input_format}" "${output_report}"
     fi
 
-    used_ip_count=$(echo -e "${used_ips}" | wc -l)
-    subnet_count=$(echo -e "${annotations}" | wc -l)
+    local readonly used_ip_count=$(echo -e "${used_ips}" | wc -l)
+    local readonly subnet_count=$(echo -e "${annotations}" | wc -l)
 
     inf "Generating heatmap with ${used_ip_count} IPs in ${subnet_count} subnets"
     # Generate heatmap
@@ -169,41 +169,41 @@ process() {
             -s <(echo -e "${shades}") \
             -f "Helvetica-12" \
             -y "${cidr_to_render}" \
-            -o "${outputfile}" \
+            -o "${output_heatmap}" \
             -z 0 \
             -m \
             -r
     local readonly heatmapsize="800x800"
     inf "Resize heatmap to ${heatmapsize}"
-    convert "${outputfile}" \
+    convert "${output_heatmap}" \
         -resize "${heatmapsize}" \
-        "${outputfile}"
+        "${output_heatmap}"
     inf "Enhance image with parameter title and border"
     montage \
         -label "${used_ip_count} ips allocated in ${subnet_count} subnets of ${cidr_to_render} - $(date)"\
         -pointsize 18 \
         -frame 5 -geometry +0+0 \
-        "${outputfile}" \
-        "${outputfile}"
-    inf "File '${outputfile}' generated"
+        "${output_heatmap}" \
+        "${output_heatmap}"
+    inf "File '${output_heatmap}' generated"
 }
 
 makeReport(){
     local readonly input="${1}"
     local readonly input_format="${2}"
-    local readonly output="${3}"
-    assertNotEmpty "input file name" "${input:-}"
+    local readonly output_file="${3}"
     assertNotEmpty "input_format" "${input_format:-}"
-    assertNotEmpty "output file name" "${output:-}"
+    assertNotEmpty "output file name" "${output_file:-}"
 
     list_of_objects=($(readSubnets "${input}" "${input_format}" | while read subnet; do
             echo -e "$(convertSubnet "${subnet}" | jq -c '.')"
         done
     ))
     combined_objects="$(printf ",%s" "${list_of_objects[@]}")"
-    echo "[ ${combined_objects:1} ]" | jq '.'  > "${output}"
+    echo "[ ${combined_objects:1} ]" | jq '.'  > "${output_file}"
 }
 
+# Convert a subnet JSON
 convertSubnet() {
     local readonly subnet="${1}"
     local readonly cidr=$(getCidr "${subnet}" "${input_format}")
@@ -319,9 +319,9 @@ countIPsInCidr() {
 
 # Create the ipv4-heatmap annotation file (names for cidr ranges)
 makeAnnotations() {
-    local readonly subnet_file="${1}"
+    local readonly input="${1}"
     local readonly input_format="${2}"
-    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
+    readSubnets "${input}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         local readonly name=$(getName "${subnet}" "${input_format}")
         echo "${cidr}\t${name}"
@@ -330,23 +330,23 @@ makeAnnotations() {
 
 # Create the ipv4-heatmap shades file (background for cidr ranges)
 makeShades() {
-    local readonly subnet_file="${1}"
+    local readonly input="${1}"
     local readonly input_format="${2}"
-    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
+    readSubnets "${input}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         echo "${cidr}\t$(randomCidrColor)\t96"
     done
 }
 
 readSubnets() {
-    local readonly subnet_file="${1}"
+    local readonly input="${1}"
     local readonly input_format="${2}"
     case "${input_format,,}" in
         "aws" )
-            jq -c '.[] | .[]' "${subnet_file}"
+            echo "${input}" | jq -c '.[] | .[]'
         ;;
         "simple" | "" )
-            jq -c '.[]' "${subnet_file}"
+            echo "${input}" | jq -c '.[]'
         ;;
         *)
             error "Unknown input format '${input_format}'"
@@ -357,15 +357,15 @@ readSubnets() {
 
 # Create the ipv4-heatmap ip list (list of used ips in all subnets)
 makeIPListOfUsedIPs() {
-    local readonly subnet_file="${1}"
+    local readonly input="${1}"
     local readonly input_format="${2}"
-    readSubnets "${subnet_file}" "${input_format}" | while read subnet; do
+    readSubnets "${input}" "${input_format}" | while read subnet; do
         local readonly cidr=$(getCidr "${subnet}" "${input_format}")
         local readonly name=$(getName "${subnet}" "${input_format}")
         local readonly available=$(getAvailable "${subnet}" "${input_format}")
         local readonly total=$(( $(countIPsInCidr "$cidr") + 2 ))
         local readonly used=$((total - available))
-        debug "Processing '${name}' with CIDR '${cidr}'"
+        inf "Processing '${name}' with CIDR '${cidr}'"
         debug " total IPs: ${total}"
         debug " available IPs: ${available}"
         debug " used IPs: ${used}"
@@ -375,7 +375,10 @@ makeIPListOfUsedIPs() {
             warn "CIDR ${cidr} invalid used (${used}) > total (${total})"
         fi
         # Generate a list of <n> IPs from a cidr
-        nmap -sL ${cidr} | grep "Nmap scan report" | awk '{print $NF}' | head -n "${used}"
+        debug "Generating ip list with ${used} ip addresses in cidr ${cidr}"
+        # nmap -sL ${cidr} | grep "Nmap scan report" | awk '{print $NF}' | head -n "${used}"
+        prips ${cidr} | head -n "${used}"
+        debug "IP list generated"
     done
 }
 
