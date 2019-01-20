@@ -17,7 +17,7 @@ Based on https://github.com/measurement-factory/ipv4-heatmap
 Find ready to run [Docker images in my dockerhub repo](https://cloud.docker.com/u/olafrauch/repository/docker/olafrauch/ipviz)
 
 Run them e.g. with 
-`aws ec2 describe-subnets --output json | docker -t --rm olafrauch/ipviz:1.0.5`
+`aws ec2 describe-subnets --output json | docker run -t --rm olafrauch/ipviz:1.0.5`
 
 ```
 Transforms a list of subnets with allocated ips in a simple heatmap png
