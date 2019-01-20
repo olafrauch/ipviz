@@ -5,18 +5,24 @@ Transforms a list of json subnets to a heatmap png
 Highlights:
 
 * Visualize your aws subnets as map to get an overview of available IP ranges and ip usage of each subnet.
-* Feed with output from `aws ec2 describe-subnets --output json`
-* JSON report with usage metrics of the subnets
+* Accepts input as
+  * Feed with output from `aws ec2 describe-subnets --output json`
+  * Simple JSON based list for custom input
+* Produces the following output:
+  * PNG with a heatmap like usage vizualisation
+  * (optional) JSON report with usage metrics of the subnets in an 'enhanced simple input format' for further processing
 
 Based on https://github.com/measurement-factory/ipv4-heatmap
 
 Find ready to run [Docker images in my dockerhub repo](https://cloud.docker.com/u/olafrauch/repository/docker/olafrauch/ipviz)
 
+Run them e.g. with 
+`aws ec2 describe-subnets --output json | docker -t --rm olafrauch/ipviz:1.0.5`
 
 ```
 Transforms a list of subnets with allocated ips in a simple heatmap png
 =======================================================================
-usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] [-t aws|simple] input_json
+usage: ipviz.sh [OPTIONS] [-c cidr_limit] [-o output_png] [-t aws|simple] input_json|STDIN
 
 OPTIONS:
     -d : Debug output
@@ -32,7 +38,7 @@ OPTIONS:
     -r : Export input file as enhanced output file compatible with SIMPLE File format
 
 input_json:
-    file with json array and the following object structure:
+    file or stdin with json array and the following object structure:
     SIMPLE:
     [
       {
@@ -63,13 +69,16 @@ Required tools:
  - ipcalc
  - nmap
  - grepcidr
-
-
 ```
 
 ## Example
 
 `./ipviz.sh -r -o examples/example_1.png -t simple examples/example_1.json`
+
+or
+
+`cat examples/example_1.json | ./ipviz.sh -r -o examples/example_1.png -t simple`
+
 
 Input:
 

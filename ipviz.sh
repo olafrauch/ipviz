@@ -11,7 +11,7 @@ usage() {
     cat << EOF
 Transforms a list of subnets with allocated ips in a simple heatmap png
 =======================================================================
-usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] [-t aws|simple] input_json
+usage: $PROGRAM [OPTIONS] [-c cidr_limit] [-o output_png] [-t aws|simple] input_json|STDIN
 
 OPTIONS:
     -d : Debug output
@@ -27,7 +27,7 @@ OPTIONS:
     -r : Export input file as enhanced output file compatible with SIMPLE File format
 
 input_json:
-    file with json array and the following object structure:
+    file or stdin with json array and the following object structure:
     SIMPLE:
     [
       {
@@ -65,7 +65,7 @@ EOF
 main() {
     validate_environment
     parse_arguments $@
-    local readonly input="${ARG_PARAMETERS[0]:-}"
+    local readonly input="${ARG_PARAMETERS[0]:-/dev/stdin}"
     declare -a args
     if [[ ${#ARG_PARAMETERS[@]} -gt 1 ]]; then
         args=("${ARG_PARAMETERS[@]:1}")
@@ -103,14 +103,6 @@ validate_input_file () {
     if [[ -z ${input} ]]; then
         usage
         error "Error: *** input file is missing."
-        exit 1
-    fi
-
-    if [[ ! -f ${input} ]]; then
-        usage
-        error "Error: *** input file ${input} not found"
-        error "PWD = $(pwd)"
-        error "$(ls -la)"
         exit 1
     fi
 }
@@ -373,7 +365,7 @@ makeIPListOfUsedIPs() {
         local readonly available=$(getAvailable "${subnet}" "${input_format}")
         local readonly total=$(( $(countIPsInCidr "$cidr") + 2 ))
         local readonly used=$((total - available))
-        debug "Processing ${name} with CIDR ${cidr}"
+        debug "Processing '${name}' with CIDR '${cidr}'"
         debug " total IPs: ${total}"
         debug " available IPs: ${available}"
         debug " used IPs: ${used}"
@@ -421,6 +413,14 @@ parse_arguments() {
 }
 
 
+required_arg() {
+    required_value "${1}" "${2}" "Missing argument"
+}
+
+assertNotEmpty() {
+    required_value "${1}" "${2}" "Internal error. Value missing for:"
+}
+
 required_value() {
     local readonly name="${1:-}"
     local readonly value="${2:-}"
@@ -432,14 +432,6 @@ required_value() {
     fi
 }
 
-required_arg() {
-    required_value "${1}" "${2}" "Missing argument"
-}
-
-assertNotEmpty() {
-    required_value "${1}" "${2}" "Internal error. Value missing for:"
-}
-
 init_logging() {
     exec 3>&2 # logging stream (file descriptor 3) defaults to STDERR
     LOG_LEVEL=${LOG_LEVEL:-4} # default to show info
@@ -449,33 +441,6 @@ init_logging() {
     LOGLEVEL_WARNING=3
     LOGLEVEL_INFO=4
     LOGLEVEL_DEBUG=5
-}
-
-# Maximum length of separator line
-linewidth() {
-    # line - length of iso8601 date - length log level column - database
-    printf '%d' $(($(maxwidth) - 25 - 18 - 10))
-}
-
-# Get a line of terminal width minus logging prefix. $1: Line character
-line() {
-    printf '%*s' "$(linewidth)" '' | tr ' ' "${1:--}"
-}
-
-# Maximum length of logging line
-maxwidth() {
-    local width=0
-    if tput cols 2>&1 > /dev/null; then
-        width=$((${COLUMNS:-$(tput cols)} - 4))
-    fi
-    # 0: in case of error
-    width=$(( width = 0 ? 400 : ${width}))
-    # Max in case of jenkins build
-    if [[ ! -z ${JENKINS_URL:-} ]]; then
-      width=400
-    fi
-    # Minimum 40
-    printf '%d' $(( width < 40 ? 40 : ${width} ))
 }
 
 notify() { log $LOGLEVEL_SILENT "$1"; }
@@ -513,10 +478,7 @@ log() {
     if [[ ${LOG_LEVEL} -ge $1 ]]; then
         local readonly datestring=$(date +'%Y-%m-%dT%H:%M:%S%z')
         # Expand escaped characters, wrap at maxwidth chars, indent wrapped lines
-        echo -e "${3:-}" \
- "${datestring} $(loglevelpad ${loglevelnames[$1]}) $2" | \
- fold -w$(maxwidth) -s | \
- sed '2~1s/^/  /' >&3
+        echo -e "${3:-}" "${datestring} $(loglevelpad ${loglevelnames[$1]}) $2" | sed '2~1s/^/  /' >&3
     fi
 }
 
