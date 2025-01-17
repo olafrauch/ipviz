@@ -322,8 +322,8 @@ makeAnnotations() {
     local readonly input="${1}"
     local readonly input_format="${2}"
     readSubnets "${input}" "${input_format}" | while read subnet; do
-        local readonly cidr=$(getCidr "${subnet}" "${input_format}")
-        local readonly name=$(getName "${subnet}" "${input_format}")
+        local readonly cidr="$(getCidr "${subnet}" "${input_format}")"
+        local readonly name="$(getName "${subnet}" "${input_format}")"
         echo "${cidr}\t${name}"
     done
 }
@@ -360,8 +360,8 @@ makeIPListOfUsedIPs() {
     local readonly input="${1}"
     local readonly input_format="${2}"
     readSubnets "${input}" "${input_format}" | while read subnet; do
-        local readonly cidr=$(getCidr "${subnet}" "${input_format}")
-        local readonly name=$(getName "${subnet}" "${input_format}")
+        local readonly cidr="$(getCidr "${subnet}" "${input_format}")"
+        local readonly name="$(getName "${subnet}" "${input_format}")"
         local readonly available=$(getAvailable "${subnet}" "${input_format}")
         local readonly total=$(( $(countIPsInCidr "$cidr") + 2 ))
         local readonly used=$((total - available))
