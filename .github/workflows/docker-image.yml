@@ -18,7 +18,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ vars.DOCKER_USERNAME }}/my-image
+        images: ${{ vars.DOCKER_USERNAME }}/ipviz
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
